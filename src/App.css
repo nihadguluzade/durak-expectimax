@@ -59,6 +59,7 @@ body {
 .desk {
   display: flex;
   padding: 50px 25px;
+  justify-content: center;
 }
 
 .desk .stacked-desk-cards {

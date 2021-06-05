@@ -11,7 +11,7 @@ class Card {
   }
 
   getImage(): string {
-    return `assets/cards/${this.rank}_of_${this.suit.toLowerCase()}.svg`;
+    return `assets/cards/${this.rank.valueOf()}_of_${this.suit.toLowerCase()}.svg`;
   }
 
   getRank() {
@@ -24,6 +24,10 @@ class Card {
 
   toString() {
     return `${this.rank} of ${this.suit}`;
+  }
+
+  equals(card: Card) {
+    return this.rank == card.rank && this.suit == card.suit;
   }
 }
 

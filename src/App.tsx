@@ -3,28 +3,23 @@ import './App.css';
 import Card from "./models/Card";
 import {Suit} from "./models/Suit";
 import {Rank} from "./models/Rank";
+import Player from './models/Player';
 
-class State {}
+class ComponentState {
+  gameState: GameState = GameState.NEW_GAME;
+  stack: Array<Card> | undefined;
+  trump: Card | undefined;
+  players: Array<Player> = new Array<Player>();
+}
 
-class App extends Component<any, State> {
+enum GameState {
+  NEW_GAME,
+  WAITING_FOR_MOVE
+}
 
-  state: State = new State();
+class App extends Component<any, ComponentState> {
 
-  opponentCards: Array<Card> = [
-    new Card(Rank.SEVEN, Suit.SPADES),
-    new Card(Rank.NINE, Suit.CLUBS),
-    new Card(Rank.JACK, Suit.HEARTS),
-    new Card(Rank.SIX, Suit.CLUBS),
-    new Card(Rank.NINE, Suit.DIAMONDS),
-  ];
-
-  playerCards: Array<Card> = [
-    new Card(Rank.KING, Suit.CLUBS),
-    new Card(Rank.QUEEN, Suit.SPADES),
-    new Card(Rank.EIGHT, Suit.SPADES),
-    new Card(Rank.ACE, Suit.DIAMONDS),
-    new Card(Rank.ACE, Suit.HEARTS),
-  ];
+  state: ComponentState = new ComponentState();
 
   desk: Map<number, Array<Card>> = new Map([
     [0, [new Card(Rank.QUEEN, Suit.CLUBS), new Card(Rank.TEN, Suit.CLUBS)]],
@@ -34,19 +29,6 @@ class App extends Component<any, State> {
   discarded: Array<Card> = [
     new Card(Rank.SIX, Suit.CLUBS),
     new Card(Rank.SIX, Suit.DIAMONDS),
-  ];
-
-  trump: Card = new Card(Rank.ACE, Suit.DIAMONDS);
-
-  stack: Array<Card> = [
-    new Card(Rank.SIX, Suit.CLUBS),
-    new Card(Rank.SIX, Suit.DIAMONDS),
-    new Card(Rank.SIX, Suit.HEARTS),
-    new Card(Rank.SIX, Suit.SPADES),
-    new Card(Rank.SEVEN, Suit.CLUBS),
-    new Card(Rank.SEVEN, Suit.DIAMONDS),
-    new Card(Rank.SEVEN, Suit.HEARTS),
-    new Card(Rank.SEVEN, Suit.SPADES),
   ];
 
   renderCards = (player: Array<Card>): ReactNode => {
@@ -103,6 +85,7 @@ class App extends Component<any, State> {
           degree += 15;
           return (
             <img src="assets/cards/card_back.svg" 
+                 key={index}
                  className="game-card-img" 
                  style={{transform: `rotate(${degree}deg)`}}
                  alt="closed card" />
@@ -113,41 +96,106 @@ class App extends Component<any, State> {
   }
 
   renderStack = (): ReactNode => {
-    return (
-      <div className="stack-container">
-        <img src={this.trump.getImage()}
-             className="game-card-img"
-             style={{transform: `rotate(90deg)`}}
-             alt="trump card" />
-        {this.stack.length > 2 && (
-          <img src="assets/cards/card_back.svg" className="game-card-img" alt="stack" />
-        )}
-      </div>
-    )
+    const {trump, stack} = this.state;
+    if (trump != undefined && stack != undefined) {
+      return (
+        <div className="stack-container">
+          <img src={trump.getImage()}
+               className="game-card-img"
+               style={{transform: `rotate(90deg)`}}
+               alt="trump card" />
+          {stack.length > 2 && (
+            <img src="assets/cards/card_back.svg" className="game-card-img" alt="stack" />
+          )}
+        </div>
+      )
+    } else {
+      console.error("trump is undefined");
+    }
+  }
+
+  initializeStack = (): Array<Card> => {
+    const stack: Array<Card> = new Array<Card>();
+    for (const suit of Object.values(Suit)) {
+      for (const rank of Object.values(Rank)) {
+        stack.push(new Card(rank, suit));
+      }
+    }
+    console.log("stack is initialized.");
+    return stack;
+  }
+
+  startNewGame = (): void => {
+    const players: Array<Player> = [new Player(), new Player()];
+    const stack: Array<Card> = this.initializeStack();
+    const trump: Card = stack[Math.floor(Math.random() * stack.length)];
+
+    let stackLen = stack.length;
+    for (let i = 0, j = 0; i < 12; i++, i == 6 && j++) {
+      let randomCard: Card = stack[Math.floor(Math.random() * stackLen)];
+      while (randomCard.equals(trump)) {
+        randomCard = stack[Math.floor(Math.random() * stackLen)];
+      }
+      players[j].getCards().push(randomCard);
+      stack.splice(stack.findIndex(x => x == randomCard), 1);
+      stackLen--;
+    }
+
+    console.log("trump ->", trump);
+    console.log("players[0] ->", players[0]);
+    console.log("players[1] ->", players[1]);
+    console.log("stack ->", stack);
+
+    this.setState({ gameState: GameState.WAITING_FOR_MOVE, players, stack, trump });
   }
 
   render() {
+    const {gameState, players, trump} = this.state;
+    let currentPage;
+
+    switch (gameState) {
+      case GameState.NEW_GAME:
+        currentPage = (
+          <div className="App-header container">
+            <button className="btn btn-outline-secondary" 
+                    onClick={this.startNewGame}>
+              start game
+            </button>
+          </div>
+        );
+        break;
+      case GameState.WAITING_FOR_MOVE:
+        currentPage = (
+          <div className="App-header container">
+            <div className="row">
+              {this.renderCards(players[0].getCards())}
+            </div>
+            <div className="row">
+              <div>
+                {this.renderDiscarded()}
+              </div>
+              <div style={{width: 550}}>
+                {this.renderDesk()}
+              </div>
+              <div>
+                {this.renderStack()}
+              </div>
+            </div>
+            <div className="row">
+              {this.renderCards(players[1].getCards())}
+            </div>
+          </div>
+        );
+        break;
+      default:
+        currentPage = (
+          <span>DEFAULT_STATE</span>
+        );
+    }
+
     return (
       <div className="App">
-        <div className="App-header container">
-          <div className="row">
-            {this.renderCards(this.opponentCards)}
-          </div>
-          <div className="row">
-            <div>
-              {this.renderDiscarded()}
-            </div>
-            <div style={{width: 550}}>
-              {this.renderDesk()}
-            </div>
-            <div>
-              {this.renderStack()}
-            </div>
-          </div>
-          <div className="row">
-            {this.renderCards(this.playerCards)}
-          </div>
-        </div>
+        {currentPage}
       </div>
     )
   }
