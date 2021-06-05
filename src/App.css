@@ -1,5 +1,12 @@
 .App {
   text-align: center;
+  min-height: 100vh;
+  background: #faf9ef;
+}
+
+body {
+  --img-width: 100px;
+  --img-height: 100px;
 }
 
 .App-logo {
@@ -14,14 +21,12 @@
 }
 
 .App-header {
-  background-color: #282c34;
+  /* background-color: #282c34; */
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
 }
 
 .App-link {
@@ -35,4 +40,67 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+.cards-container {
+  margin: 0 auto;
+  padding: 50px 25px;
+}
+
+.cards-container .card-wrapper {
+  display: inline-block;
+}
+
+.game-card-img {
+  width: var(--img-width);
+  height: var(--img-height);
+}
+
+.desk {
+  display: flex;
+  padding: 50px 25px;
+}
+
+.desk .stacked-desk-cards {
+  position: relative;
+  width: var(--img-width);
+  height: var(--img-height);
+}
+
+.desk .stacked-desk-cards .game-card-img {
+  position: absolute;
+}
+
+.discarded-container {
+  position: relative;
+  width: 250px;
+  height: 200px;
+}
+
+.discarded-container .game-card-img {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  margin: auto;
+}
+
+.stack-container {
+  position: relative;
+  width: 250px;
+  height: 200px;
+}
+
+.stack-container .game-card-img {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 55px;
+  right: 0;
+  margin: auto;
+}
+
+.stack-container .game-card-img:first-child {
+  left: 0;
 }
