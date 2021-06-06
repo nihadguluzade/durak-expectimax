@@ -10,6 +10,9 @@ class ComponentState {
   stack: Array<Card> | undefined;
   trump: Card | undefined;
   players: Array<Player> = new Array<Player>();
+  // desk: Map<number, Array<Card>> = new Map();
+  desk: Array<Card> = new Array<Card>();
+  fakyu: string[] = new Array<string>();
 }
 
 enum GameState {
@@ -21,7 +24,7 @@ class App extends Component<any, ComponentState> {
 
   state: ComponentState = new ComponentState();
 
-  desk: Map<number, Array<Card>> = new Map([
+  _desk: Map<number, Array<Card>> = new Map([
     [0, [new Card(Rank.QUEEN, Suit.CLUBS), new Card(Rank.TEN, Suit.CLUBS)]],
     [1, [new Card(Rank.SIX, Suit.DIAMONDS), new Card(Rank.SEVEN, Suit.DIAMONDS)]],
   ]);
@@ -48,30 +51,32 @@ class App extends Component<any, ComponentState> {
   }
 
   renderDesk = (): ReactNode => {
+    const {desk} = this.state;
     const cards: Array<ReactNode> = new Array<ReactNode>();
-    const keyIterator: IterableIterator<number> = this.desk.keys();
-    let key = keyIterator.next();
-    while (!key.done) {
-      let leftPos = -15;
-      cards.push(
-        <div key={key.value} className="stacked-desk-cards">
-          {this.desk.get(key.value)!.map((card, index) => {
-            leftPos += 15;
-            return (
-              <img src={card.getImage()} 
-                 className="game-card-img" 
-                 style={{left: leftPos}}
-                 key={index} 
-                 alt={card.toString()}/>
-            );
-          })}
-        </div>
-      );
-      key = keyIterator.next();
-    }
+    // const keyIterator: IterableIterator<number> = desk.keys();
+
+    // let key = keyIterator.next();
+    // while (!key.done) {
+    //   let leftPos = -15;
+    //   cards.push(
+    //     <div key={key.value} className="stacked-desk-cards">
+    //       {desk.get(key.value)!.map((card, index) => {
+    //         leftPos += 15;
+    //         return (
+    //           <img src={card.getImage()} 
+    //              className="game-card-img" 
+    //              style={{left: leftPos}}
+    //              key={index} 
+    //              alt={card.toString()}/>
+    //         );
+    //       })}
+    //     </div>
+    //   );
+    //   key = keyIterator.next();
+    // }
 
     return (
-      <div className="desk">
+      <div id="Desk" className="desk">
         {cards}
       </div>
     )
@@ -146,12 +151,97 @@ class App extends Component<any, ComponentState> {
     console.log("players[1] ->", players[1]);
     console.log("stack ->", stack);
 
-    this.setState({ gameState: GameState.WAITING_FOR_MOVE, players, stack, trump });
+    this.setState({ gameState: GameState.WAITING_FOR_MOVE, players, stack, trump }, this.handleListeners);
+  }
+
+  handleListeners = (): void => {
+    const containers: Element[] = Array.from(document.querySelectorAll('.cards-container'));
+    const dropZone: HTMLElement | null = document.getElementById("Desk");
+    
+    if (containers != null && dropZone != null) {
+      const {players} = this.state;
+      const that = this;
+
+      containers.forEach(parentDiv => {
+        const images: HTMLCollection = parentDiv.getElementsByClassName("game-card-img");
+
+        if (images.length > 0) {
+          Array.from(images).forEach((img: Element, index: number) => {
+
+            let draggedCard: any;
+
+            img.addEventListener("drag", function(e) {});
+
+            // prevent these to make drop work
+            dropZone.addEventListener("dragenter", (e: any) => {
+              e.preventDefault();
+            }, false);
+
+            dropZone.addEventListener("dragover", (e: any) => {
+              e.preventDefault();
+            }, false);
+
+            img.addEventListener("dragstart", function (e: any) {
+              draggedCard = e.target;
+              e.target.style.opacity = 0.5;
+            }, false);
+
+            dropZone.addEventListener("drop", (e: any) => {
+              e.preventDefault();
+              // const {desk} = that.state;
+
+              if (draggedCard != undefined) {
+                const rank: string = draggedCard.alt.split("of")[0].trim();
+                const suit: string = draggedCard.alt.split("of")[1].trim();
+
+                players.forEach((player: Player) => {
+                  const card: Card | undefined = player.getCards().find(c => c.getRank() == rank && c.getSuit() == suit);
+
+                  if (card != undefined) {
+                    const cardIndex = player.getCards().findIndex(c => c == card);
+                    const {desk} = this.state;
+
+                    if (desk == undefined) {
+                      console.log('undefined', desk);
+                      let _desk = this.state.desk;
+                      this.setState({desk: _desk}, () => {console.log("after", this.state.desk)});
+                    } else {
+                      let _desk = this.state.desk;
+                      this.setState({desk: _desk}, () => {console.log("after", this.state.desk)});
+                    }
+
+                    player.getCards().splice(cardIndex, 1);
+  
+                    // if (Object.keys(_desk).length == 0) {
+                    //   _desk.set(102, [card]);
+                    // } else {
+                    //   _desk.forEach((value: Array<Card>, key: number) => {
+                    //     console.log(key, value);
+                    //   });
+                    // }
+
+                    const fucuk = this.state.fakyu;
+                    fucuk.push('sad');
+                    this.setState({fakyu: fucuk});
+                  }
+                })
+              }
+            });
+
+            img.addEventListener("dragend", function(e: any) {
+              e.target.style.opacity = "";
+            }, false);
+
+          });
+        }
+      });
+    }
   }
 
   render() {
-    const {gameState, players, trump} = this.state;
+    const {gameState, players, desk} = this.state;
     let currentPage;
+    console.log("render", desk);
 
     switch (gameState) {
       case GameState.NEW_GAME:

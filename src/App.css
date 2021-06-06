@@ -60,6 +60,7 @@ body {
   display: flex;
   padding: 50px 25px;
   justify-content: center;
+  min-height: 200px;
 }
 
 .desk .stacked-desk-cards {
