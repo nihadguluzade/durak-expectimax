@@ -4,7 +4,7 @@ import Card from "./models/Card";
 import {Suit} from "./models/Suit";
 import {Rank} from "./models/Rank";
 import Player from './models/Player';
-import {Alert} from "react-bootstrap";
+import {Alert, Button} from "react-bootstrap";
 
 enum GameState {
   NEW_GAME,
@@ -19,19 +19,14 @@ class ComponentState {
   desk: Array<Card> = new Array<Card>();
   errorAlert: string | undefined;
   move: Player = this.players[0];
+  discarded: Array<Card> = new Array<Card>();
 }
 
 class App extends Component<any, ComponentState> {
 
   state: ComponentState = new ComponentState();
 
-  discarded: Array<Card> = [
-    new Card(Rank.SIX, Suit.CLUBS),
-    new Card(Rank.SIX, Suit.DIAMONDS),
-  ];
-
   renderCards = (player: Player): ReactNode => {
-    console.log(this.state.move, player, this.state.move == player);
     return (
       <div className="section">
         <div className="cards-container">
@@ -84,16 +79,49 @@ class App extends Component<any, ComponentState> {
 
     return (
       <div id="Desk" className="desk">
-        {stacks}
+        <div className="stack-wrapper">
+          {stacks}
+        </div>
+        {desk.length > 0 && (desk.length % 2 == 0 ? (
+          <button className="btn btn-sm btn-outline-primary mt-4" onClick={this.endRound}>End Round</button>
+        ) : (
+          <Button variant="outline-danger" size="sm" className="mt-4" onClick={this.take}>Take</Button>
+        ))}
       </div>
     )
   }
 
+  endRound = (): void => {
+    const {desk, discarded} = this.state;
+    while (desk.length != 0) discarded.push(desk.pop()!);
+    this.setState({desk, discarded});
+    this.switchMove();
+  }
+
+  take = (): void => {
+    const {move, players, desk} = this.state;
+    const player: Player | undefined = players.find(p => p != move);
+    if (player != undefined) {
+      while (desk.length != 0) player.getCards().push(desk.pop()!);
+      this.setState({desk, players});
+    }
+  }
+
+  switchMove = (): void => {
+    const {move, players} = this.state;
+    if (move == players[0]) {
+      this.setState({move: players[1]});
+    } else {
+      this.setState({move: players[0]});
+    }
+  }
+
   renderDiscarded = (): ReactNode => {
+    const {discarded} = this.state;
     let degree = -30;
     return (
       <div className="discarded-container">
-        {this.discarded.map((card: Card, index: number) => {
+        {discarded.map((card: Card, index: number) => {
           degree += 15;
           return (
             <img src="assets/cards/card_back.svg" 

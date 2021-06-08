@@ -66,10 +66,13 @@ body {
 }
 
 .desk {
-  display: flex;
   padding: 50px 25px;
   justify-content: center;
   min-height: 200px;
+}
+
+.desk .stack-wrapper {
+  display: flex;
 }
 
 .desk .stacked-desk-cards {
