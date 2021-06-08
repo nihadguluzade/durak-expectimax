@@ -34,7 +34,7 @@ class App extends Component<any, ComponentState> {
             return (
               <div key={index} className="card-wrapper">
                 <button className="btn btn-outline-light"
-                        // disabled={this.state.move != player}
+                        disabled={this.state.move != player}
                         onClick={() => this.go(player, card, index)}>
                   <img src={card.getImage()} className="game-card-img" alt={card.toString()} />
                 </button>
@@ -136,7 +136,7 @@ class App extends Component<any, ComponentState> {
   }
 
   renderStack = (): ReactNode => {
-    const {trump, stack} = this.state;
+    const {trump, stack, players} = this.state;
     if (trump != undefined && stack != undefined) {
       return (
         <div className="stack-container">
@@ -147,11 +147,47 @@ class App extends Component<any, ComponentState> {
           {stack.length > 2 && (
             <img src="assets/cards/card_back.svg" className="game-card-img" alt="stack" />
           )}
+          <span style={{
+            position: 'absolute',
+            top: '43%',
+            right: 0
+          }}>Cards: {stack.length}</span>
+          <Button variant="outline-secondary"
+                  size="sm"
+                  className="pl-3 pr-3"
+                  style={{position: 'absolute', top: 0}}
+                  onClick={() => this.drawCard(players[0])}>Draw</Button>
+          <Button variant="outline-secondary"
+                  size="sm"
+                  className="pl-3 pr-3"
+                  style={{position: 'absolute', bottom: 0}}
+                  onClick={() => this.drawCard(players[1])}>Draw</Button>
         </div>
       )
     } else {
       console.error("trump is undefined");
     }
+  }
+
+  drawCard = (player: Player): void => {
+    const {players, stack} = this.state;
+
+    const _player: Player = players.find(p => p == player)!;
+
+    if (stack == undefined || _player == undefined) return;
+
+    if (stack.length == 0) {
+      this.setState({errorAlert: "No cards left"});
+      return;
+    }
+
+    if (_player.getCards().length >= 6) {
+      this.setState({errorAlert: "Already have 6 or more cards"});
+      return;
+    }
+
+    _player.getCards().push(stack.pop()!);
+    this.setState({players, stack});
   }
 
   initializeStack = (): Array<Card> => {
@@ -242,7 +278,8 @@ class App extends Component<any, ComponentState> {
 
     player.getCards().splice(index, 1);
     desk.push(card);
-    this.setState({desk, move: player});
+    this.setState({desk});
+    this.switchMove();
   }
 
   /* drag is not working properly */
