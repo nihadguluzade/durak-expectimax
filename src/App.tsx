@@ -5,19 +5,17 @@ import {Suit} from "./models/Suit";
 import {Rank} from "./models/Rank";
 import Player from './models/Player';
 
+enum GameState {
+  NEW_GAME,
+  WAITING_FOR_MOVE
+}
+
 class ComponentState {
   gameState: GameState = GameState.NEW_GAME;
   stack: Array<Card> | undefined;
   trump: Card | undefined;
   players: Array<Player> = new Array<Player>();
-  // desk: Map<number, Array<Card>> = new Map();
   desk: Array<Card> = new Array<Card>();
-  fakyu: string[] = new Array<string>();
-}
-
-enum GameState {
-  NEW_GAME,
-  WAITING_FOR_MOVE
 }
 
 class App extends Component<any, ComponentState> {
@@ -34,14 +32,16 @@ class App extends Component<any, ComponentState> {
     new Card(Rank.SIX, Suit.DIAMONDS),
   ];
 
-  renderCards = (player: Array<Card>): ReactNode => {
+  renderCards = (playerCards: Array<Card>): ReactNode => {
     return (
       <div className="section">
         <div className="cards-container">
-          {player.map((card: Card, index: number) => {
+          {playerCards.map((card: Card, index: number) => {
             return (
               <div key={index} className="card-wrapper">
-                <img src={card.getImage()} className="game-card-img" alt={card.toString()} />
+                <button className="btn btn-outline-light" onClick={() => this.go(playerCards, card, index)}>
+                  <img src={card.getImage()} className="game-card-img" alt={card.toString()} />
+                </button>
               </div>
             );
           })}
@@ -53,31 +53,37 @@ class App extends Component<any, ComponentState> {
   renderDesk = (): ReactNode => {
     const {desk} = this.state;
     const cards: Array<ReactNode> = new Array<ReactNode>();
-    // const keyIterator: IterableIterator<number> = desk.keys();
+    const stacks: Array<ReactNode> = new Array<ReactNode>();
+    let leftPos = -15;
+    
+    desk.map((card: Card, index: number) => {
+      if (index % 2 == 1) {
+        leftPos += 15;
+      }
 
-    // let key = keyIterator.next();
-    // while (!key.done) {
-    //   let leftPos = -15;
-    //   cards.push(
-    //     <div key={key.value} className="stacked-desk-cards">
-    //       {desk.get(key.value)!.map((card, index) => {
-    //         leftPos += 15;
-    //         return (
-    //           <img src={card.getImage()} 
-    //              className="game-card-img" 
-    //              style={{left: leftPos}}
-    //              key={index} 
-    //              alt={card.toString()}/>
-    //         );
-    //       })}
-    //     </div>
-    //   );
-    //   key = keyIterator.next();
-    // }
+      cards.push(
+        <img src={card.getImage()}
+             className="game-card-img"
+             style={{left: leftPos}}
+             key={index}
+             alt={card.toString()}/>
+      );
+    });
+
+    for (let i = 0; i < cards.length; i++) {
+      if (i % 2 == 0) {
+        stacks.push(
+          <div key={i} className="stacked-desk-cards">
+            {cards[i]}
+            {i + 1 < cards.length && cards[i + 1]}
+          </div>
+        );
+      }
+    }
 
     return (
       <div id="Desk" className="desk">
-        {cards}
+        {stacks}
       </div>
     )
   }
@@ -151,16 +157,23 @@ class App extends Component<any, ComponentState> {
     console.log("players[1] ->", players[1]);
     console.log("stack ->", stack);
 
-    this.setState({ gameState: GameState.WAITING_FOR_MOVE, players, stack, trump }, this.handleListeners);
+    this.setState({ gameState: GameState.WAITING_FOR_MOVE, players, stack, trump });
   }
 
+  go = (playerCards: Array<Card>, card: Card, index: number): void => {
+    const {desk} = this.state;
+    playerCards.splice(index, 1);
+    desk.push(card);
+    this.setState({desk});
+  }
+
+  /* drag is not working properly */
   handleListeners = (): void => {
     const containers: Element[] = Array.from(document.querySelectorAll('.cards-container'));
     const dropZone: HTMLElement | null = document.getElementById("Desk");
     
     if (containers != null && dropZone != null) {
       const {players} = this.state;
-      const that = this;
 
       containers.forEach(parentDiv => {
         const images: HTMLCollection = parentDiv.getElementsByClassName("game-card-img");
@@ -170,7 +183,9 @@ class App extends Component<any, ComponentState> {
 
             let draggedCard: any;
 
-            img.addEventListener("drag", function(e) {});
+            img.addEventListener("drag", function(e) {
+              console.log("drag", e!.target!);
+            }, false);
 
             // prevent these to make drop work
             dropZone.addEventListener("dragenter", (e: any) => {
@@ -183,46 +198,28 @@ class App extends Component<any, ComponentState> {
 
             img.addEventListener("dragstart", function (e: any) {
               draggedCard = e.target;
+              console.log("dragstart", draggedCard.alt);
               e.target.style.opacity = 0.5;
             }, false);
 
             dropZone.addEventListener("drop", (e: any) => {
               e.preventDefault();
-              // const {desk} = that.state;
 
               if (draggedCard != undefined) {
                 const rank: string = draggedCard.alt.split("of")[0].trim();
                 const suit: string = draggedCard.alt.split("of")[1].trim();
+                console.log("drop", rank, suit);
 
                 players.forEach((player: Player) => {
                   const card: Card | undefined = player.getCards().find(c => c.getRank() == rank && c.getSuit() == suit);
-
                   if (card != undefined) {
                     const cardIndex = player.getCards().findIndex(c => c == card);
                     const {desk} = this.state;
 
-                    if (desk == undefined) {
-                      console.log('undefined', desk);
-                      let _desk = this.state.desk;
-                      this.setState({desk: _desk}, () => {console.log("after", this.state.desk)});
-                    } else {
-                      let _desk = this.state.desk;
-                      this.setState({desk: _desk}, () => {console.log("after", this.state.desk)});
-                    }
-
                     player.getCards().splice(cardIndex, 1);
-  
-                    // if (Object.keys(_desk).length == 0) {
-                    //   _desk.set(102, [card]);
-                    // } else {
-                    //   _desk.forEach((value: Array<Card>, key: number) => {
-                    //     console.log(key, value);
-                    //   });
-                    // }
+                    desk.push(card);
 
-                    const fucuk = this.state.fakyu;
-                    fucuk.push('sad');
-                    this.setState({fakyu: fucuk});
+                    this.setState({desk});
                   }
                 })
               }

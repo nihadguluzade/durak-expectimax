@@ -51,6 +51,10 @@ body {
   display: inline-block;
 }
 
+.cards-container .card-wrapper .btn:hover {
+  border: 1px solid #333;
+}
+
 .game-card-img {
   width: var(--img-width);
   height: var(--img-height);
