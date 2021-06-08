@@ -100,10 +100,11 @@ class App extends Component<any, ComponentState> {
 
   take = (): void => {
     const {move, players, desk} = this.state;
-    const player: Player | undefined = players.find(p => p != move);
+    const player: Player | undefined = players.find(p => p == move);
     if (player != undefined) {
       while (desk.length != 0) player.getCards().push(desk.pop()!);
       this.setState({desk, players});
+      this.switchMove();
     }
   }
 
@@ -170,11 +171,16 @@ class App extends Component<any, ComponentState> {
   }
 
   drawCard = (player: Player): void => {
-    const {players, stack} = this.state;
+    const {players, stack, desk} = this.state;
 
     const _player: Player = players.find(p => p == player)!;
 
     if (stack == undefined || _player == undefined) return;
+
+    if (desk.length > 0) {
+      this.setState({errorAlert: "No drawing in the middle of round"});
+      return;
+    }
 
     if (stack.length == 0) {
       this.setState({errorAlert: "No cards left"});
@@ -190,6 +196,14 @@ class App extends Component<any, ComponentState> {
     this.setState({players, stack});
   }
 
+  shuffle = (array: Array<any>): Array<any> => {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+  }
+
   initializeStack = (): Array<Card> => {
     const stack: Array<Card> = new Array<Card>();
     for (const suit of Object.values(Suit)) {
@@ -197,14 +211,13 @@ class App extends Component<any, ComponentState> {
         stack.push(new Card(rank, suit));
       }
     }
-    console.log("stack is initialized.");
-    return stack;
+    return this.shuffle(stack);
   }
 
   startNewGame = (): void => {
     const players: Array<Player> = [new Player(), new Player()];
     const stack: Array<Card> = this.initializeStack();
-    const trump: Card = stack[Math.floor(Math.random() * stack.length)];
+    const trump: Card = stack[0];
 
     let stackLen = stack.length;
     for (let i = 0, j = 0; i < 12; i++, i == 6 && j++) {
@@ -272,7 +285,12 @@ class App extends Component<any, ComponentState> {
   }
 
   go = (player: Player, card: Card, index: number): void => {
-    const {desk} = this.state;
+    const {desk, players, stack} = this.state;
+
+    if (desk.length == 0 && stack!.length != 0 && (players[0].getCards().length < 6 || players[1].getCards().length < 6)) {
+      this.setState({errorAlert: "Draw cards first"});
+      return;
+    }
 
     if (!this.validateGo(card)) return;
 
