@@ -11,7 +11,25 @@ class Card {
   }
 
   getImage(): string {
-    return `assets/cards/${this.rank.valueOf()}_of_${this.suit.toLowerCase()}.svg`;
+    let rank;
+    switch (this.rank) {
+      case Rank.JACK:
+        rank = 'jack';
+        break;
+      case Rank.QUEEN:
+        rank = 'queen';
+        break;
+      case Rank.KING:
+        rank = 'king';
+        break;
+      case Rank.ACE:
+        rank = 'ace';
+        break;
+      default:
+        rank = this.rank;
+        break;
+    }
+    return `assets/cards/${rank}_of_${this.suit.toLowerCase()}.svg`;
   }
 
   getRank() {

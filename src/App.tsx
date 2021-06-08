@@ -4,6 +4,7 @@ import Card from "./models/Card";
 import {Suit} from "./models/Suit";
 import {Rank} from "./models/Rank";
 import Player from './models/Player';
+import {Alert} from "react-bootstrap";
 
 enum GameState {
   NEW_GAME,
@@ -16,30 +17,30 @@ class ComponentState {
   trump: Card | undefined;
   players: Array<Player> = new Array<Player>();
   desk: Array<Card> = new Array<Card>();
+  errorAlert: string | undefined;
+  move: Player = this.players[0];
 }
 
 class App extends Component<any, ComponentState> {
 
   state: ComponentState = new ComponentState();
 
-  _desk: Map<number, Array<Card>> = new Map([
-    [0, [new Card(Rank.QUEEN, Suit.CLUBS), new Card(Rank.TEN, Suit.CLUBS)]],
-    [1, [new Card(Rank.SIX, Suit.DIAMONDS), new Card(Rank.SEVEN, Suit.DIAMONDS)]],
-  ]);
-
   discarded: Array<Card> = [
     new Card(Rank.SIX, Suit.CLUBS),
     new Card(Rank.SIX, Suit.DIAMONDS),
   ];
 
-  renderCards = (playerCards: Array<Card>): ReactNode => {
+  renderCards = (player: Player): ReactNode => {
+    console.log(this.state.move, player, this.state.move == player);
     return (
       <div className="section">
         <div className="cards-container">
-          {playerCards.map((card: Card, index: number) => {
+          {player.getCards().map((card: Card, index: number) => {
             return (
               <div key={index} className="card-wrapper">
-                <button className="btn btn-outline-light" onClick={() => this.go(playerCards, card, index)}>
+                <button className="btn btn-outline-light"
+                        // disabled={this.state.move != player}
+                        onClick={() => this.go(player, card, index)}>
                   <img src={card.getImage()} className="game-card-img" alt={card.toString()} />
                 </button>
               </div>
@@ -55,7 +56,7 @@ class App extends Component<any, ComponentState> {
     const cards: Array<ReactNode> = new Array<ReactNode>();
     const stacks: Array<ReactNode> = new Array<ReactNode>();
     let leftPos = -15;
-    
+
     desk.map((card: Card, index: number) => {
       if (index % 2 == 1) {
         leftPos += 15;
@@ -113,7 +114,7 @@ class App extends Component<any, ComponentState> {
         <div className="stack-container">
           <img src={trump.getImage()}
                className="game-card-img"
-               style={{transform: `rotate(90deg)`}}
+               style={{transform: `rotate(-90deg)`}}
                alt="trump card" />
           {stack.length > 2 && (
             <img src="assets/cards/card_back.svg" className="game-card-img" alt="stack" />
@@ -157,14 +158,63 @@ class App extends Component<any, ComponentState> {
     console.log("players[1] ->", players[1]);
     console.log("stack ->", stack);
 
-    this.setState({ gameState: GameState.WAITING_FOR_MOVE, players, stack, trump });
+    this.setState({ gameState: GameState.WAITING_FOR_MOVE, players, stack, trump, move: players[1] });
   }
 
-  go = (playerCards: Array<Card>, card: Card, index: number): void => {
+  validateGo = (card: Card): boolean => {
+    const {desk, trump} = this.state;
+
+    if (desk.length == 0) return true;
+
+    const possibleRanks: Array<Rank> = new Array<Rank>();
+    const lastPlayedCard: Card = desk[desk.length - 1];
+
+    desk.forEach(card => possibleRanks.push(card.getRank()));
+
+    if (trump == undefined) return false;
+
+    if (card.getSuit() == trump.getSuit()) {
+      if (desk.length % 2 == 1) {
+        if (lastPlayedCard.getSuit() == trump.getSuit() && parseInt(card.getRank()) < parseInt(lastPlayedCard.getRank())) {
+          this.setState({errorAlert: "Low trump rank"});
+          return false;
+        } else {
+          return true;
+        }
+      }
+    } else if (desk.length % 2 == 1 && lastPlayedCard.getSuit() == trump.getSuit() && card.getSuit() != trump.getSuit()) {
+      this.setState({errorAlert: "Low rank"});
+      return false;
+    }
+
+    if (desk.length % 2 == 1) {
+      if (card.getSuit() != lastPlayedCard.getSuit()) {
+        this.setState({errorAlert: "Incompatible suits"})
+        return false;
+      }
+
+      if (parseInt(card.getRank()) < parseInt(lastPlayedCard.getRank())) {
+        this.setState({errorAlert: "Rank is low"})
+        return false;
+      }
+    } else {
+      if (!possibleRanks.includes(card.getRank())) {
+        this.setState({errorAlert: "Incompatible card"});
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  go = (player: Player, card: Card, index: number): void => {
     const {desk} = this.state;
-    playerCards.splice(index, 1);
+
+    if (!this.validateGo(card)) return;
+
+    player.getCards().splice(index, 1);
     desk.push(card);
-    this.setState({desk});
+    this.setState({desk, move: player});
   }
 
   /* drag is not working properly */
@@ -236,9 +286,8 @@ class App extends Component<any, ComponentState> {
   }
 
   render() {
-    const {gameState, players, desk} = this.state;
+    const {gameState, players, errorAlert} = this.state;
     let currentPage;
-    console.log("render", desk);
 
     switch (gameState) {
       case GameState.NEW_GAME:
@@ -255,7 +304,7 @@ class App extends Component<any, ComponentState> {
         currentPage = (
           <div className="App-header container">
             <div className="row">
-              {this.renderCards(players[0].getCards())}
+              {this.renderCards(players[0])}
             </div>
             <div className="row">
               <div>
@@ -269,7 +318,7 @@ class App extends Component<any, ComponentState> {
               </div>
             </div>
             <div className="row">
-              {this.renderCards(players[1].getCards())}
+              {this.renderCards(players[1])}
             </div>
           </div>
         );
@@ -282,6 +331,11 @@ class App extends Component<any, ComponentState> {
 
     return (
       <div className="App">
+        {errorAlert != undefined && errorAlert.length > 0 && (
+            <Alert variant="danger" onClose={() => this.setState({errorAlert: undefined})} dismissible>
+              {errorAlert}
+            </Alert>
+        )}
         {currentPage}
       </div>
     )

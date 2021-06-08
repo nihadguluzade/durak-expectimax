@@ -55,6 +55,11 @@ body {
   border: 1px solid #333;
 }
 
+.cards-container .card-wrapper .btn-outline-light.disabled,
+.cards-container .card-wrapper .btn-outline-light:disabled {
+  background-color: #9c0c0c;
+}
+
 .game-card-img {
   width: var(--img-width);
   height: var(--img-height);
