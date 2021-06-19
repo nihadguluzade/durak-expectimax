@@ -5,6 +5,7 @@ import {Suit} from "./models/Suit";
 import {Rank} from "./models/Rank";
 import Player from './models/Player';
 import {Alert, Button} from "react-bootstrap";
+import {cloneBoard} from "./utils";
 
 enum GameState {
   NEW_GAME,
@@ -18,13 +19,113 @@ class ComponentState {
   players: Array<Player> = new Array<Player>();
   desk: Array<Card> = new Array<Card>();
   errorAlert: string | undefined;
-  move: Player = this.players[0];
+  move: Player | undefined;
   discarded: Array<Card> = new Array<Card>();
+}
+
+enum Agent {
+  PLAYER,
+  OPPONENT
 }
 
 class App extends Component<any, ComponentState> {
 
   state: ComponentState = new ComponentState();
+
+  probableEnemyCards = [
+    new Card(Rank.ACE, Suit.CLUBS),
+    new Card(Rank.TEN, Suit.HEARTS),
+    new Card(Rank.SIX, Suit.CLUBS),
+  ];
+
+  getBestMove = (): number => {
+    const {desk, players} = this.state;
+
+    let bestMove = -1;
+    let bestScore = 0;
+
+    const moves = ["take", "attack"];
+    const board = desk;
+    const playerCards = players[0].getCards();
+    const depth = 3;
+
+    for (let i = 0; i < moves.length; i++) {
+      const newBoard = cloneBoard(board);
+
+      // todo check if move possible
+
+      let newScore = this.expectimax(newBoard, playerCards, depth, Agent.OPPONENT);
+
+      if (newScore == undefined)  {
+        console.log("undefined.");
+        return -1;
+      }
+
+      if (newScore > bestScore) {
+        bestMove = i;
+        bestScore = newScore;
+      }
+    }
+
+    return bestMove;
+  }
+
+  expectimax = (board: Array<Card>, playerCards: Array<Card>, depth: any, agent: Agent) => {
+
+    if (depth == 0) {
+      return this.getScore(board);
+    }
+
+    if (Agent.PLAYER) {
+      let score = 0;
+
+      for (let i = 0; i < playerCards.length; i++) {
+        let newBoard = cloneBoard(board);
+        // fixme attack?
+        newBoard = this.simulateMove(newBoard, playerCards[i]);
+        let newScore = this.expectimax(newBoard, playerCards, depth - 1, Agent.OPPONENT);
+
+        if (newScore == undefined)  {
+          console.log("undefined.");
+          return -1;
+        }
+
+        if (newScore > score)
+          score = newScore;
+      }
+
+      return score;
+
+    } else if (Agent.OPPONENT) {
+      let totalScore = 0;
+
+      for (let i = 0; i < this.probableEnemyCards.length; i++) {
+        let newBoard = cloneBoard(board);
+        newBoard = this.simulateMove(newBoard, this.probableEnemyCards[i]);
+        let newScore = this.expectimax(newBoard, playerCards, depth - 1, Agent.PLAYER);
+
+        if (newScore == undefined)  {
+          console.log("undefined.");
+          return -1;
+        }
+
+        totalScore += ((1 / this.probableEnemyCards.length) * newScore);
+      }
+
+      return totalScore;
+    }
+
+    return undefined;
+  }
+
+  getScore = (board: any) => {
+    return 1;
+  }
+
+  simulateMove = (board: Array<Card>, card: Card) => {
+    board.push(card);
+    return board;
+  }
 
   renderCards = (player: Player): ReactNode => {
     return (
@@ -108,12 +209,13 @@ class App extends Component<any, ComponentState> {
     }
   }
 
+  /** players[0] - ai, players[1] - human */
   switchMove = (): void => {
     const {move, players} = this.state;
     if (move == players[0]) {
       this.setState({move: players[1]});
     } else {
-      this.setState({move: players[0]});
+      this.setState({move: players[0]}, this.getBestMove);
     }
   }
 
