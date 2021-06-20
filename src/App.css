@@ -118,3 +118,9 @@ body {
 .stack-container .game-card-img:first-child {
   left: 0;
 }
+
+.App .alert-danger {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+}

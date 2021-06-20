@@ -4,7 +4,7 @@ import Card from "./models/Card";
 import {Suit} from "./models/Suit";
 import {Rank} from "./models/Rank";
 import Player from './models/Player';
-import {Alert, Button} from "react-bootstrap";
+import {Alert, Button, Modal} from "react-bootstrap";
 import {cloneArray, shuffle} from "./utils";
 
 enum GameState {
@@ -21,6 +21,7 @@ class ComponentState {
   errorAlert: string | undefined;
   move: Player | undefined;
   discarded: Array<Card> = new Array<Card>();
+  winAlert: boolean = false;
 }
 
 enum Agent {
@@ -104,6 +105,7 @@ class App extends Component<any, ComponentState> {
 
     } else if (move.move == Move.AttackOrDefend && move.card != undefined) {
       if (desk.length == 0 && players[0].getCards().length < 6) {
+        console.log("deficit");
         this.drawCard(players[0], {param1: players[0], param2: move.card});
       } else {
         this.go(players[0], move.card);
@@ -331,7 +333,7 @@ class App extends Component<any, ComponentState> {
       } else {
         if (i > 6) {
           if (parseInt(playerCards[i].getRank()) < 11) {
-            totalScore -= (parseInt(playerCards[i].getRank()) - 5);
+            totalScore -= (parseInt(playerCards[i].getRank()) - 7);
           } else {
             totalScore -= (parseInt(playerCards[i].getRank()) * 0.5);
           }
@@ -461,9 +463,11 @@ class App extends Component<any, ComponentState> {
   switchMove = (): void => {
     const {move, players} = this.state;
     if (move == players[0]) {
+      this.drawCard(players[1]);
       this.setState({move: players[1]});
     } else {
       this.setState({move: players[0]}, () => {
+        this.drawCard(players[0]);
         setTimeout(this.playBestMove, 1000);
       });
     }
@@ -493,10 +497,12 @@ class App extends Component<any, ComponentState> {
     if (trump != undefined && stack != undefined) {
       return (
         <div className="stack-container">
-          <img src={trump.getImage()}
-               className="game-card-img"
-               style={{transform: `rotate(-90deg)`}}
-               alt="trump card" />
+          {stack.length > 0 && (
+            <img src={trump.getImage()}
+                 className="game-card-img"
+                 style={{transform: `rotate(-90deg)`}}
+                 alt="trump card" />
+          )}
           {stack.length > 2 && (
             <img src="assets/cards/card_back.svg" className="game-card-img" alt="stack" />
           )}
@@ -544,7 +550,10 @@ class App extends Component<any, ComponentState> {
       return;
     }
 
-    _player.getCards().push(stack.pop()!);
+    while (_player.getCards().length < 6) {
+      _player.getCards().push(stack.pop()!);
+    }
+
     this.setState({players, stack, errorAlert: undefined}, () => {
       if (go != undefined) {
         this.go(go.param1, go.param2);
@@ -646,79 +655,19 @@ class App extends Component<any, ComponentState> {
       .findIndex(c => c.getRank() == card.getRank() && c.getSuit() == card.getSuit()), 1);
     desk.push(card);
     this.setState({desk, errorAlert: undefined});
+    if (player.getCards().length == 0) {
+      this.final();
+      return;
+    }
     this.switchMove();
   }
 
-  /* drag is not working properly */
-  handleListeners = (): void => {
-    const containers: Element[] = Array.from(document.querySelectorAll('.cards-container'));
-    const dropZone: HTMLElement | null = document.getElementById("Desk");
-    
-    if (containers != null && dropZone != null) {
-      const {players} = this.state;
-
-      containers.forEach(parentDiv => {
-        const images: HTMLCollection = parentDiv.getElementsByClassName("game-card-img");
-
-        if (images.length > 0) {
-          Array.from(images).forEach((img: Element, index: number) => {
-
-            let draggedCard: any;
-
-            img.addEventListener("drag", function(e) {
-              console.log("drag", e!.target!);
-            }, false);
-
-            // prevent these to make drop work
-            dropZone.addEventListener("dragenter", (e: any) => {
-              e.preventDefault();
-            }, false);
-
-            dropZone.addEventListener("dragover", (e: any) => {
-              e.preventDefault();
-            }, false);
-
-            img.addEventListener("dragstart", function (e: any) {
-              draggedCard = e.target;
-              console.log("dragstart", draggedCard.alt);
-              e.target.style.opacity = 0.5;
-            }, false);
-
-            dropZone.addEventListener("drop", (e: any) => {
-              e.preventDefault();
-
-              if (draggedCard != undefined) {
-                const rank: string = draggedCard.alt.split("of")[0].trim();
-                const suit: string = draggedCard.alt.split("of")[1].trim();
-                console.log("drop", rank, suit);
-
-                players.forEach((player: Player) => {
-                  const card: Card | undefined = player.getCards().find(c => c.getRank() == rank && c.getSuit() == suit);
-                  if (card != undefined) {
-                    const cardIndex = player.getCards().findIndex(c => c == card);
-                    const {desk} = this.state;
-
-                    player.getCards().splice(cardIndex, 1);
-                    desk.push(card);
-
-                    this.setState({desk});
-                  }
-                })
-              }
-            });
-
-            img.addEventListener("dragend", function(e: any) {
-              e.target.style.opacity = "";
-            }, false);
-
-          });
-        }
-      });
-    }
+  final = () => {
+    this.setState({winAlert: true});
   }
 
   render() {
-    const {gameState, players, errorAlert} = this.state;
+    const {gameState, players, errorAlert, winAlert} = this.state;
     let currentPage;
 
     switch (gameState) {
@@ -768,6 +717,14 @@ class App extends Component<any, ComponentState> {
               {errorAlert}
             </Alert>
         )}
+        <Modal show={winAlert} onHide={() => this.setState({winAlert: false})}>
+          <Modal.Body><span style={{fontSize: 20}}>Game Ended!</span></Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={() => this.setState({winAlert: false})}>
+              Close
+            </Button>
+          </Modal.Footer>
+        </Modal>
         {currentPage}
       </div>
     )
