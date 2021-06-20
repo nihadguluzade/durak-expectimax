@@ -5,7 +5,7 @@ import {Suit} from "./models/Suit";
 import {Rank} from "./models/Rank";
 import Player from './models/Player';
 import {Alert, Button} from "react-bootstrap";
-import {cloneBoard} from "./utils";
+import {cloneArray, shuffle} from "./utils";
 
 enum GameState {
   NEW_GAME,
@@ -35,15 +35,54 @@ enum Move {
   End_Round = "end"
 }
 
+class Board {
+  desk: Card[];
+  players: Player[];
+  stack: Card[];
+  opponentCardCount: number;
+
+  constructor(desk: Card[], players: Player[], stack: Card[], opponentCardCount: number) {
+    this.desk = desk;
+    this.players = players;
+    this.stack = stack;
+    this.opponentCardCount = opponentCardCount;
+  }
+
+  clone() {
+    let newDesk = new Array<Card>();
+    let newPlayers = new Array<Player>();
+    let newStack = new Array<Card>();
+
+    const arrs = [this.desk, this.players, this.stack];
+
+    for (let i = 0; i < arrs.length; i++) {
+      for (let j = 0; j < arrs[i].length; j++)
+      {
+        if (arrs[i] == this.desk) {
+          // @ts-ignore
+          newDesk[j] = arrs[i][j];
+        } else if (arrs[i] == this.players) {
+          // @ts-ignore
+          newPlayers[j] = arrs[i][j];
+        } else if (arrs[i] == this.players) {
+          // @ts-ignore
+          newStack[j] = arrs[i][j];
+        }
+      }
+    }
+
+    return new Board(newDesk, newPlayers, newStack, this.opponentCardCount);
+  }
+}
+
 class App extends Component<any, ComponentState> {
 
   state: ComponentState = new ComponentState();
 
-  possibleEnemyCards = [
-    new Card(Rank.ACE, Suit.CLUBS),
-    new Card(Rank.TEN, Suit.HEARTS),
-    new Card(Rank.SIX, Suit.CLUBS),
-  ];
+  getPossibleOpponentCards = (stack: Card[], opponentCards: Card[]) => {
+    stack.splice(0 ,1);
+    return shuffle(stack.concat(opponentCards));
+  }
 
   playBestMove = () => {
     const {players} = this.state;
@@ -51,33 +90,33 @@ class App extends Component<any, ComponentState> {
     console.log("move:", move);
     if (move == undefined) {
       console.log("undefined move");
-    } else {
+    } else if (move.move == Move.Defend) {
       this.go(players[0], move.card);
     }
   }
 
   determineBestMove = (): {move: Move, card: Card} | undefined => {
-    const {desk, players} = this.state;
+    const {desk, players, stack} = this.state;
 
     let bestMove: {move: Move, card: Card} | undefined;
-    let bestScore = 0;
+    let bestScore = -1;
 
     const moves = [Move.Defend, Move.Take];
-    const board = desk;
     const playerCards = players[0].getCards();
-    const depth = 3;
+    const opponentCards = this.getPossibleOpponentCards(stack!, players[1].getCards());
+    const board = new Board(desk, [players[0], new Player(opponentCards)], stack!, opponentCards.length);
+    const depth = 2;
 
     for (let i = 0; i < moves.length; i++) {
-      let newBoard = cloneBoard(board);
-
       if (moves[i] == Move.Defend) {
         for (let j = 0; j < playerCards.length; j++) {
+          let newBoard = board.clone();
           const card = playerCards[j];
 
-          if (this.validateMove(newBoard, card))
+          if (!this.validateMove(newBoard.desk, card))
             continue;
 
-          newBoard = this.simulateMove(Move.Defend, newBoard, card);
+          newBoard = this.simulateMove(Move.Defend, newBoard, card, 0);
           let newScore = this.expectimax(newBoard, playerCards, depth, Agent.OPPONENT);
 
           if (newScore == undefined)  {
@@ -90,31 +129,35 @@ class App extends Component<any, ComponentState> {
             bestScore = newScore;
           }
         }
+      } else if (moves[i] == Move.Take) {
+        //newBoard = this.simulateMove(Move.Take, newBoard);
       }
     }
 
     return bestMove;
   }
 
-  expectimax = (board: Array<Card>, playerCards: Array<Card>, depth: any, agent: Agent) => {
+  expectimax = (board: Board, playerCards: Array<Card>, depth: number, agent: Agent) => {
 
     if (depth == 0) {
-      return this.getScore(board);
+      return this.getFinalScore(board);
     }
 
-    if (Agent.PLAYER) {
+    if (agent == Agent.PLAYER) {
       let score = 0;
 
       const moves = [Move.Attack, Move.Take, Move.End_Round, Move.Defend];
 
-
       for (let i = 0; i < moves.length; i++) {
-        // todo check if move is possible
-
         if (moves[i] == Move.Defend) {
           for (let j = 0; j < playerCards.length; j++) {
-            let newBoard = cloneBoard(board);
-            newBoard = this.simulateMove(moves[i], newBoard, playerCards[j]);
+            let newBoard = board.clone()
+            const card = playerCards[j];
+
+            if (!this.validateMove(newBoard.desk, card))
+              continue;
+
+            newBoard = this.simulateMove(moves[i], newBoard, card, 0);
             let newScore = this.expectimax(newBoard, playerCards, depth - 1, Agent.OPPONENT);
 
             if (newScore == undefined)  {
@@ -130,16 +173,25 @@ class App extends Component<any, ComponentState> {
 
       return score;
 
-    } else if (Agent.OPPONENT) {
+    } else if (agent == Agent.OPPONENT) {
       let totalScore = 0;
 
       const moves = [Move.Attack, Move.End_Round];
 
       for (let i = 0; i < moves.length; i++) {
+
         if (moves[i] == Move.Attack) {
-          for (let j = 0; j < this.possibleEnemyCards.length; j++) {
-            let newBoard = cloneBoard(board);
-            newBoard = this.simulateMove(Move.Attack, newBoard, this.possibleEnemyCards[j]);
+          const opponentCards = board.players[1].getCards();
+          const initialOpponentCardsCount = board.opponentCardCount;
+
+          for (let j = 0; j < opponentCards.length; j++) {
+            const card = opponentCards[j];
+            let newBoard = board.clone();
+
+            if (!this.validateMove(newBoard.desk, card))
+              continue;
+
+            newBoard = this.simulateMove(Move.Attack, newBoard, card, 1);
             let newScore = this.expectimax(newBoard, playerCards, depth - 1, Agent.PLAYER);
 
             if (newScore == undefined)  {
@@ -147,7 +199,7 @@ class App extends Component<any, ComponentState> {
               return -1;
             }
 
-            totalScore += ((1 / this.possibleEnemyCards.length) * newScore);
+            totalScore += ((1 / opponentCards.length) * newScore);
           }
         }
 
@@ -159,14 +211,45 @@ class App extends Component<any, ComponentState> {
     return undefined;
   }
 
-  getScore = (board: any) => {
-    return 1;
+  getFinalScore = (board: Board) => {
+    let totalScore = 0;
+
+    const playerCards = board.players[0].getCards();
+    const desk = board.desk;
+
+    for (let i = 0; i < playerCards.length; i++) {
+      const card = playerCards[i];
+
+      if (card.getSuit() == this.state.trump!.getSuit()) {
+        totalScore += 15;
+      } else {
+        totalScore += parseInt(playerCards[i].getRank());
+      }
+
+      // penalty
+      if (i >= 6) {
+        totalScore -= 2;
+      }
+    }
+
+    return totalScore;
   }
 
-  simulateMove = (move: Move, board: Array<Card>, card: Card) => {
-    if (move == Move.Attack) {
-      board.push(card);
+  simulateMove = (move: Move, board: Board, card?: Card, playerIndex?: number) => {
+    if (card != undefined && playerIndex != undefined) {
+      if (move == Move.Attack) {
+        board.desk.push(card);
+        board.players[playerIndex].getCards().splice(board.players[playerIndex].getCards().findIndex(c => c == card), 1);
+      } else if (move == Move.Defend) {
+        board.desk.push(card);
+        board.players[playerIndex].getCards().splice(board.players[playerIndex].getCards().findIndex(c => c == card), 1);
+      }
+    } else {
+      if (move == Move.Take) {
+
+      }
     }
+
     return board;
   }
 
@@ -259,7 +342,7 @@ class App extends Component<any, ComponentState> {
       this.setState({move: players[1]});
     } else {
       this.setState({move: players[0]}, () => {
-        setTimeout(this.playBestMove, 2000);
+        setTimeout(this.playBestMove, 1000);
       });
     }
   }
@@ -343,14 +426,6 @@ class App extends Component<any, ComponentState> {
     this.setState({players, stack});
   }
 
-  shuffle = (array: Array<any>): Array<any> => {
-    for (let i = array.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [array[i], array[j]] = [array[j], array[i]];
-    }
-    return array;
-  }
-
   initializeStack = (): Array<Card> => {
     const stack: Array<Card> = new Array<Card>();
     for (const suit of Object.values(Suit)) {
@@ -358,7 +433,7 @@ class App extends Component<any, ComponentState> {
         stack.push(new Card(rank, suit));
       }
     }
-    return this.shuffle(stack);
+    return shuffle(stack);
   }
 
   startNewGame = (): void => {

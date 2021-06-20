@@ -2,7 +2,11 @@ import Card from "./Card";
 
 class Player {
 
-  private cards: Array<Card> = new Array<Card>();
+  private cards: Array<Card>;
+
+  constructor(cards?: Card[]) {
+    this.cards = cards || new Array<Card>();
+  }
 
   getCards() {
     return this.cards;
