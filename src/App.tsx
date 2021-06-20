@@ -58,6 +58,8 @@ class Board {
 
     const arrs = [this.desk, this.stack, this.discarded];
 
+    console.debug("Clone:", this.desk, this.players, this.stack, this.discarded);
+
     for (let i = 0; i < this.players.length; i++) {
       const cards: Card[] = this.players[i].getCards();
       newPlayers[i] = new Player();
@@ -96,7 +98,7 @@ class App extends Component<any, ComponentState> {
   }
 
   playBestMove = () => {
-    const {desk, players} = this.state;
+    const {players, stack} = this.state;
     const move: {move: Move, card?: Card} | undefined = this.determineBestMove();
     console.log("move:", move);
 
@@ -104,18 +106,13 @@ class App extends Component<any, ComponentState> {
       console.log("undefined move");
 
     } else if (move.move == Move.AttackOrDefend && move.card != undefined) {
-      if (desk.length == 0 && players[0].getCards().length < 6) {
-        console.log("deficit");
-        this.drawCard(players[0], {param1: players[0], param2: move.card});
-      } else {
-        this.go(players[0], move.card);
-      }
+      this.go(players[0], move.card);
 
     } else if (move.move == Move.Take) {
       this.take();
 
     } else if (move.move == Move.End_Round) {
-      this.endRound(players[0]);
+      this.endRound();
     }
   }
 
@@ -127,7 +124,7 @@ class App extends Component<any, ComponentState> {
 
     const moves = [Move.AttackOrDefend, Move.Take, Move.End_Round];
     const playerCards = players[0].getCards();
-    // const opponentCards = this.getPossibleOpponentCards(stack!, players[1].getCards());
+    // const opponentCards = this.getPossibleOpponentCards(cloneArray(stack!), players[1].getCards());
     const opponentCards = players[1].getCards();
     const board = new Board(desk, [players[0], new Player(opponentCards)], stack!, discarded);
     const depth = 2;
@@ -332,11 +329,16 @@ class App extends Component<any, ComponentState> {
         totalScore += 25;
       } else {
         if (i > 6) {
-          if (parseInt(playerCards[i].getRank()) < 11) {
-            totalScore -= (parseInt(playerCards[i].getRank()) - 7);
+          if (board.stack.length < 2) {
+            totalScore -= 10;
           } else {
-            totalScore -= (parseInt(playerCards[i].getRank()) * 0.5);
+            if (parseInt(playerCards[i].getRank()) < 11) {
+              totalScore -= (parseInt(playerCards[i].getRank()) - 7);
+            } else {
+              totalScore -= (parseInt(playerCards[i].getRank()) * 0.5);
+            }
           }
+
         } else {
           totalScore += parseInt(playerCards[i].getRank());
         }
@@ -376,15 +378,17 @@ class App extends Component<any, ComponentState> {
       <div className="section">
         <div className="cards-container">
           {player.getCards().map((card: Card, index: number) => {
-            return (
-              <div key={index} className="card-wrapper">
-                <button className="btn btn-outline-light"
-                        disabled={this.state.move != player}
-                        onClick={() => this.go(player, card)}>
-                  <img src={card.getImage()} className="game-card-img" alt={card.toString()} />
-                </button>
-              </div>
-            );
+            if (card != undefined) {
+              return (
+                <div key={index} className="card-wrapper">
+                  <button className="btn btn-outline-light"
+                          disabled={this.state.move != player}
+                          onClick={() => this.go(player, card)}>
+                    <img src={card.getImage()} className="game-card-img" alt={card.toString()}/>
+                  </button>
+                </div>
+              );
+            }
           })}
         </div>
       </div>
@@ -428,7 +432,7 @@ class App extends Component<any, ComponentState> {
           {stacks}
         </div>
         {desk.length > 0 && (desk.length % 2 == 0 ? (
-          <button className="btn btn-sm btn-outline-primary mt-4" onClick={() => this.endRound(players[1])}>
+          <button className="btn btn-sm btn-outline-primary mt-4" onClick={this.endRound}>
             End Round
           </button>
         ) : (
@@ -438,14 +442,10 @@ class App extends Component<any, ComponentState> {
     )
   }
 
-  endRound = (drawFor?: Player): void => {
+  endRound = (): void => {
     const {desk, discarded} = this.state;
     while (desk.length != 0) discarded.push(desk.pop()!);
-    this.setState({desk, discarded}, () => {
-      if (drawFor != undefined) {
-        this.drawCard(drawFor);
-      }
-    });
+    this.setState({desk, discarded});
     this.switchMove();
   }
 
@@ -461,13 +461,13 @@ class App extends Component<any, ComponentState> {
 
   /** players[0] - ai, players[1] - human */
   switchMove = (): void => {
-    const {move, players} = this.state;
+    const {move, players, stack} = this.state;
+    this.drawCard(players[0]);
+    this.drawCard(players[1]);
     if (move == players[0]) {
-      this.drawCard(players[1]);
       this.setState({move: players[1]});
     } else {
       this.setState({move: players[0]}, () => {
-        this.drawCard(players[0]);
         setTimeout(this.playBestMove, 1000);
       });
     }
@@ -495,6 +495,7 @@ class App extends Component<any, ComponentState> {
   renderStack = (): ReactNode => {
     const {trump, stack, players} = this.state;
     if (trump != undefined && stack != undefined) {
+      console.debug("Stack:", stack);
       return (
         <div className="stack-container">
           {stack.length > 0 && (
@@ -528,7 +529,7 @@ class App extends Component<any, ComponentState> {
     }
   }
 
-  drawCard = (player: Player, go?: any): void => {
+  drawCard = (player: Player): void => {
     const {players, stack, desk} = this.state;
 
     const _player: Player = players.find(p => p == player)!;
@@ -554,11 +555,7 @@ class App extends Component<any, ComponentState> {
       _player.getCards().push(stack.pop()!);
     }
 
-    this.setState({players, stack, errorAlert: undefined}, () => {
-      if (go != undefined) {
-        this.go(go.param1, go.param2);
-      }
-    });
+    this.setState({players, stack, errorAlert: undefined});
   }
 
   initializeStack = (): Array<Card> => {
