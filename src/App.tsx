@@ -28,42 +28,68 @@ enum Agent {
   OPPONENT
 }
 
+enum Move {
+  Attack = "attack",
+  Defend = "defend",
+  Take = "take",
+  End_Round = "end"
+}
+
 class App extends Component<any, ComponentState> {
 
   state: ComponentState = new ComponentState();
 
-  probableEnemyCards = [
+  possibleEnemyCards = [
     new Card(Rank.ACE, Suit.CLUBS),
     new Card(Rank.TEN, Suit.HEARTS),
     new Card(Rank.SIX, Suit.CLUBS),
   ];
 
-  getBestMove = (): number => {
+  playBestMove = () => {
+    const {players} = this.state;
+    const move: {move: Move, card: Card} | undefined = this.determineBestMove();
+    console.log("move:", move);
+    if (move == undefined) {
+      console.log("undefined move");
+    } else {
+      this.go(players[0], move.card);
+    }
+  }
+
+  determineBestMove = (): {move: Move, card: Card} | undefined => {
     const {desk, players} = this.state;
 
-    let bestMove = -1;
+    let bestMove: {move: Move, card: Card} | undefined;
     let bestScore = 0;
 
-    const moves = ["take", "attack"];
+    const moves = [Move.Defend, Move.Take];
     const board = desk;
     const playerCards = players[0].getCards();
     const depth = 3;
 
     for (let i = 0; i < moves.length; i++) {
-      const newBoard = cloneBoard(board);
+      let newBoard = cloneBoard(board);
 
-      // todo check if move possible
+      if (moves[i] == Move.Defend) {
+        for (let j = 0; j < playerCards.length; j++) {
+          const card = playerCards[j];
 
-      let newScore = this.expectimax(newBoard, playerCards, depth, Agent.OPPONENT);
+          if (this.validateMove(newBoard, card))
+            continue;
 
-      if (newScore == undefined)  {
-        console.log("undefined.");
-        return -1;
-      }
+          newBoard = this.simulateMove(Move.Defend, newBoard, card);
+          let newScore = this.expectimax(newBoard, playerCards, depth, Agent.OPPONENT);
 
-      if (newScore > bestScore) {
-        bestMove = i;
-        bestScore = newScore;
+          if (newScore == undefined)  {
+            console.log("undefined");
+            return undefined;
+          }
+
+          if (newScore > bestScore) {
+            bestMove = {move: Move.Defend, card};
+            bestScore = newScore;
+          }
+        }
       }
     }
 
@@ -79,19 +105,27 @@ class App extends Component<any, ComponentState> {
     if (Agent.PLAYER) {
       let score = 0;
 
-      for (let i = 0; i < playerCards.length; i++) {
-        let newBoard = cloneBoard(board);
-        // fixme attack?
-        newBoard = this.simulateMove(newBoard, playerCards[i]);
-        let newScore = this.expectimax(newBoard, playerCards, depth - 1, Agent.OPPONENT);
+      const moves = [Move.Attack, Move.Take, Move.End_Round, Move.Defend];
 
-        if (newScore == undefined)  {
-          console.log("undefined.");
-          return -1;
+
+      for (let i = 0; i < moves.length; i++) {
+        // todo check if move is possible
+
+        if (moves[i] == Move.Defend) {
+          for (let j = 0; j < playerCards.length; j++) {
+            let newBoard = cloneBoard(board);
+            newBoard = this.simulateMove(moves[i], newBoard, playerCards[j]);
+            let newScore = this.expectimax(newBoard, playerCards, depth - 1, Agent.OPPONENT);
+
+            if (newScore == undefined)  {
+              console.log("undefined");
+              return -1;
+            }
+
+            if (newScore > score)
+              score = newScore;
+          }
         }
-
-        if (newScore > score)
-          score = newScore;
       }
 
       return score;
@@ -99,17 +133,24 @@ class App extends Component<any, ComponentState> {
     } else if (Agent.OPPONENT) {
       let totalScore = 0;
 
-      for (let i = 0; i < this.probableEnemyCards.length; i++) {
-        let newBoard = cloneBoard(board);
-        newBoard = this.simulateMove(newBoard, this.probableEnemyCards[i]);
-        let newScore = this.expectimax(newBoard, playerCards, depth - 1, Agent.PLAYER);
+      const moves = [Move.Attack, Move.End_Round];
 
-        if (newScore == undefined)  {
-          console.log("undefined.");
-          return -1;
+      for (let i = 0; i < moves.length; i++) {
+        if (moves[i] == Move.Attack) {
+          for (let j = 0; j < this.possibleEnemyCards.length; j++) {
+            let newBoard = cloneBoard(board);
+            newBoard = this.simulateMove(Move.Attack, newBoard, this.possibleEnemyCards[j]);
+            let newScore = this.expectimax(newBoard, playerCards, depth - 1, Agent.PLAYER);
+
+            if (newScore == undefined)  {
+              console.log("undefined");
+              return -1;
+            }
+
+            totalScore += ((1 / this.possibleEnemyCards.length) * newScore);
+          }
         }
 
-        totalScore += ((1 / this.probableEnemyCards.length) * newScore);
       }
 
       return totalScore;
@@ -122,8 +163,10 @@ class App extends Component<any, ComponentState> {
     return 1;
   }
 
-  simulateMove = (board: Array<Card>, card: Card) => {
-    board.push(card);
+  simulateMove = (move: Move, board: Array<Card>, card: Card) => {
+    if (move == Move.Attack) {
+      board.push(card);
+    }
     return board;
   }
 
@@ -136,7 +179,7 @@ class App extends Component<any, ComponentState> {
               <div key={index} className="card-wrapper">
                 <button className="btn btn-outline-light"
                         disabled={this.state.move != player}
-                        onClick={() => this.go(player, card, index)}>
+                        onClick={() => this.go(player, card)}>
                   <img src={card.getImage()} className="game-card-img" alt={card.toString()} />
                 </button>
               </div>
@@ -215,7 +258,9 @@ class App extends Component<any, ComponentState> {
     if (move == players[0]) {
       this.setState({move: players[1]});
     } else {
-      this.setState({move: players[0]}, this.getBestMove);
+      this.setState({move: players[0]}, () => {
+        setTimeout(this.playBestMove, 2000);
+      });
     }
   }
 
@@ -340,45 +385,45 @@ class App extends Component<any, ComponentState> {
     this.setState({ gameState: GameState.WAITING_FOR_MOVE, players, stack, trump, move: players[1] });
   }
 
-  validateGo = (card: Card): boolean => {
-    const {desk, trump} = this.state;
+  validateMove = (board: Card[], card: Card, showErrors = false): boolean => {
+    const {trump} = this.state;
 
-    if (desk.length == 0) return true;
+    if (board.length == 0) return true;
 
     const possibleRanks: Array<Rank> = new Array<Rank>();
-    const lastPlayedCard: Card = desk[desk.length - 1];
+    const lastPlayedCard: Card = board[board.length - 1];
 
-    desk.forEach(card => possibleRanks.push(card.getRank()));
+    board.forEach(card => possibleRanks.push(card.getRank()));
 
     if (trump == undefined) return false;
 
     if (card.getSuit() == trump.getSuit()) {
-      if (desk.length % 2 == 1) {
+      if (board.length % 2 == 1) {
         if (lastPlayedCard.getSuit() == trump.getSuit() && parseInt(card.getRank()) < parseInt(lastPlayedCard.getRank())) {
-          this.setState({errorAlert: "Low trump rank"});
+          showErrors && this.setState({errorAlert: "Low trump rank"});
           return false;
         } else {
           return true;
         }
       }
-    } else if (desk.length % 2 == 1 && lastPlayedCard.getSuit() == trump.getSuit() && card.getSuit() != trump.getSuit()) {
-      this.setState({errorAlert: "Low rank"});
+    } else if (board.length % 2 == 1 && lastPlayedCard.getSuit() == trump.getSuit() && card.getSuit() != trump.getSuit()) {
+      showErrors && this.setState({errorAlert: "Low rank"});
       return false;
     }
 
-    if (desk.length % 2 == 1) {
+    if (board.length % 2 == 1) {
       if (card.getSuit() != lastPlayedCard.getSuit()) {
-        this.setState({errorAlert: "Incompatible suits"})
+        showErrors && this.setState({errorAlert: "Incompatible suits"})
         return false;
       }
 
       if (parseInt(card.getRank()) < parseInt(lastPlayedCard.getRank())) {
-        this.setState({errorAlert: "Rank is low"})
+        showErrors && this.setState({errorAlert: "Rank is low"})
         return false;
       }
     } else {
       if (!possibleRanks.includes(card.getRank())) {
-        this.setState({errorAlert: "Incompatible card"});
+        showErrors && this.setState({errorAlert: "Incompatible card"});
         return false;
       }
     }
@@ -386,7 +431,7 @@ class App extends Component<any, ComponentState> {
     return true;
   }
 
-  go = (player: Player, card: Card, index: number): void => {
+  go = (player: Player, card: Card): void => {
     const {desk, players, stack} = this.state;
 
     if (desk.length == 0 && stack!.length != 0 && (players[0].getCards().length < 6 || players[1].getCards().length < 6)) {
@@ -394,9 +439,9 @@ class App extends Component<any, ComponentState> {
       return;
     }
 
-    if (!this.validateGo(card)) return;
+    if (!this.validateMove(desk, card, true)) return;
 
-    player.getCards().splice(index, 1);
+    player.getCards().splice(player.getCards().findIndex(c => c == card), 1);
     desk.push(card);
     this.setState({desk});
     this.switchMove();
