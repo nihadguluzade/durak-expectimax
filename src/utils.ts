@@ -1,7 +1,7 @@
-export function cloneArray(board: Array<any>) {
+export function cloneArray(arr: Array<any>) {
   let newArr = [];
-  for (let i = 0; i < board.length; i++) {
-    newArr[i] = board[i];
+  for (let i = 0; i < arr.length; i++) {
+    newArr[i] = arr[i];
   }
   return newArr;
 }
