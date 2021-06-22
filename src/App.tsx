@@ -7,29 +7,29 @@ import Player from './models/Player';
 import {Alert, Button, Modal} from "react-bootstrap";
 import {cloneArray, shuffle} from "./utils";
 
-enum GameState {
+enum Page {
   NEW_GAME,
-  WAITING_FOR_MOVE
+  PLAY
 }
 
 class ComponentState {
-  gameState: GameState = GameState.NEW_GAME;
+  page: Page = Page.NEW_GAME;
   stack: Array<Card> | undefined;
   trump: Card | undefined;
   players: Array<Player> = new Array<Player>();
   desk: Array<Card> = new Array<Card>();
   errorAlert: string | undefined;
   side: Player | undefined;
-  agent: Agent = Agent.OPPONENT;
+  agent: number = 0;
   discarded: Array<Card> = new Array<Card>();
   winAlert: boolean = false;
   pause: boolean = false;
+  AIvsAI: boolean = false;
 }
 
 enum Agent {
   PLAYER,
-  OPPONENT,
-  CHANCE
+  OPPONENT
 }
 
 enum Move {
@@ -99,8 +99,6 @@ class App extends Component<any, ComponentState> {
 
   private moveQualities: Array<{score: number, move: Move, card?: Card}> = new Array<{score: number; move: Move; card?: Card}>();
 
-  private agents: Agent[] = [Agent.PLAYER, Agent.CHANCE, Agent.OPPONENT, Agent.CHANCE];
-
   getPossibleOpponentCards = (stack: Card[], opponentCards: Card[]) => {
     stack.splice(0 ,1);
     return shuffle(stack.concat(opponentCards));
@@ -128,9 +126,12 @@ class App extends Component<any, ComponentState> {
   determineBestMove = (): {move: Move, card?: Card} | undefined => {
     const {desk, players, stack, discarded} = this.state;
 
-    // const opponentCards = this.getPossibleOpponentCards(cloneArray(stack!), players[1].getCards());
+    // const opponentCards = this.getPossibleOpponentCards(cloneArray(stack!), players[this.getOpponent()].getCards());
     const opponentCards = players[this.getOpponent()].getCards();
-    const board = new Board(desk, [players[this.getPlayer()], new Player(opponentCards)], stack!, discarded);
+    const board = new Board(desk, [
+      this.getPlayer() == 0 ? players[this.getPlayer()] : new Player(opponentCards),
+      this.getPlayer() == 0 ? new Player(opponentCards) : players[this.getPlayer()]
+    ], stack!, discarded);
     const depth = 2;
     const side = this.getPlayer();
 
@@ -331,8 +332,8 @@ class App extends Component<any, ComponentState> {
     return {exist: false, places: undefined};
   }
 
-  getFinalScore = (board: Board, side: Agent, final = false) => {
-    const playerCards = board.players[!final ? this.getPlayer() : 0].getCards();
+  getFinalScore = (board: Board, side: Agent, final?: number) => {
+    const playerCards = board.players[final == undefined ? this.getPlayer() : final].getCards();
     let totalScore = 0;
 
     for (let i = 0; i < playerCards.length; i++) {
@@ -497,16 +498,16 @@ class App extends Component<any, ComponentState> {
   }
 
   switchSide = (): void => {
-    const {side, players, pause} = this.state;
+    const {side, players, AIvsAI} = this.state;
     this.drawCard(players[this.getPlayer()]);
     this.drawCard(players[this.getOpponent()]);
     if (side == players[0]) {
       this.setState({side: players[1], agent: Agent.OPPONENT}, () => {
-        // setTimeout(this.playBestMove, 1500);
+        AIvsAI && setTimeout(this.playBestMove, 500);
       });
     } else {
       this.setState({side: players[0], agent: Agent.PLAYER}, () => {
-        setTimeout(this.playBestMove, 1000);
+        setTimeout(this.playBestMove, 500);
       });
     }
   }
@@ -626,8 +627,16 @@ class App extends Component<any, ComponentState> {
     console.log("players[1] ->", players[1]);
     console.log("stack ->", stack);
 
-    this.setState({ gameState: GameState.WAITING_FOR_MOVE, players, stack, trump, side: players[1] }, () => {
-      // setTimeout(this.playBestMove, 10000);
+    this.setState({
+      page: Page.PLAY,
+      players,
+      stack,
+      trump,
+      side: players[1],
+      agent: 1,
+      AIvsAI: false
+    }, () => {
+      this.state.AIvsAI && setTimeout(this.playBestMove, 2000);
     });
   }
 
@@ -702,16 +711,16 @@ class App extends Component<any, ComponentState> {
   final = () => {
     const {desk, players, stack, discarded} = this.state;
     const board = new Board(desk, [players[0], players[1]], stack!, discarded);
-    console.log("Final", this.getFinalScore(board, Agent.PLAYER, true));
+    console.log("Final", this.getFinalScore(board, Agent.PLAYER, 0), this.getFinalScore(board,Agent.PLAYER, 1));
     this.setState({winAlert: true});
   }
 
   render() {
-    const {gameState, players, errorAlert, winAlert, pause} = this.state;
+    const {page, players, errorAlert, winAlert, pause} = this.state;
     let currentPage;
 
-    switch (gameState) {
-      case GameState.NEW_GAME:
+    switch (page) {
+      case Page.NEW_GAME:
         currentPage = (
           <div className="App-header container">
             <button className="btn btn-outline-secondary" 
@@ -721,7 +730,7 @@ class App extends Component<any, ComponentState> {
           </div>
         );
         break;
-      case GameState.WAITING_FOR_MOVE:
+      case Page.PLAY:
         currentPage = (
           <div className="App-header container">
             <div className="row">
