@@ -126,8 +126,7 @@ class App extends Component<any, ComponentState> {
   determineBestMove = (): {move: Move, card?: Card} | undefined => {
     const {desk, players, stack, discarded} = this.state;
 
-    // const opponentCards = this.getPossibleOpponentCards(cloneArray(stack!), players[this.getOpponent()].getCards());
-    const opponentCards = players[this.getOpponent()].getCards();
+    const opponentCards = this.getPossibleOpponentCards(cloneArray(stack!), players[this.getOpponent()].getCards());
     const board = new Board(desk, [
       this.getPlayer() == 0 ? players[this.getPlayer()] : new Player(opponentCards),
       this.getPlayer() == 0 ? new Player(opponentCards) : players[this.getPlayer()]
@@ -137,20 +136,38 @@ class App extends Component<any, ComponentState> {
 
     let newBoard = board.clone();
     this.expectimax(newBoard, depth, Agent.PLAYER, side);
-
     console.log("Possible Moves", this.moveQualities);
-    let bestScore = -9999;
+
     let bestMove = undefined;
     let maxMoveCard = undefined;
-    for (let i = 0; i < this.moveQualities.length; i++) {
-      if (this.moveQualities[i].score > bestScore) {
-        bestScore = this.moveQualities[i].score;
-        bestMove = this.moveQualities[i].move;
-        maxMoveCard = this.moveQualities[i].card;
+
+    if (newBoard.stack.length == 0) {
+      let bestScore = 9999;
+      for (let i = 0; i < this.moveQualities.length; i++) {
+        if (this.moveQualities[i].score < bestScore && this.moveQualities[i].move != Move.Take) {
+          bestScore = this.moveQualities[i].score;
+          bestMove = this.moveQualities[i].move;
+          maxMoveCard = this.moveQualities[i].card;
+        }
       }
+      if (bestScore == 9999) { // mandatory take
+        bestMove = Move.Take;
+      }
+      console.log("Best Move", bestScore, bestMove, maxMoveCard);
+      return {move: bestMove!, card: maxMoveCard};
+
+    } else {
+      let bestScore = -9999;
+      for (let i = 0; i < this.moveQualities.length; i++) {
+        if (this.moveQualities[i].score > bestScore) {
+          bestScore = this.moveQualities[i].score;
+          bestMove = this.moveQualities[i].move;
+          maxMoveCard = this.moveQualities[i].card;
+        }
+      }
+      console.log("Best Move", bestScore, bestMove, maxMoveCard);
+      return {move: bestMove!, card: maxMoveCard};
     }
-    console.log("Best Move", bestScore, bestMove, maxMoveCard);
-    return {move: bestMove!, card: maxMoveCard};
   }
 
   expectimax = (board: Board, depth: number, agent: Agent, side: Agent) => {
@@ -503,11 +520,11 @@ class App extends Component<any, ComponentState> {
     this.drawCard(players[this.getOpponent()]);
     if (side == players[0]) {
       this.setState({side: players[1], agent: Agent.OPPONENT}, () => {
-        AIvsAI && setTimeout(this.playBestMove, 500);
+        AIvsAI && setTimeout(this.playBestMove, 100);
       });
     } else {
       this.setState({side: players[0], agent: Agent.PLAYER}, () => {
-        setTimeout(this.playBestMove, 500);
+        setTimeout(this.playBestMove, 100);
       });
     }
   }
@@ -550,16 +567,6 @@ class App extends Component<any, ComponentState> {
             top: '43%',
             right: 0
           }}>Cards: {stack.length}</span>
-          <Button variant="outline-secondary"
-                  size="sm"
-                  className="pl-3 pr-3"
-                  style={{position: 'absolute', top: 0}}
-                  onClick={() => this.drawCard(players[0])}>Draw</Button>
-          <Button variant="outline-secondary"
-                  size="sm"
-                  className="pl-3 pr-3"
-                  style={{position: 'absolute', bottom: 0}}
-                  onClick={() => this.drawCard(players[1])}>Draw</Button>
         </div>
       )
     } else {
